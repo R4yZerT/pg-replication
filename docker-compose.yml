@@ -1,0 +1,59 @@
+services:
+  primary:
+    image: postgres:16
+    container_name: pg-primary
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      PGDATA: /data
+    volumes:
+      - ./primary/config:/config
+      - ./primary/init:/docker-entrypoint-initdb.d
+      - primary_data:/data
+    ports:
+      - "5432:5432"
+    command: -c 'config_file=/config/postgresql.conf'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pg-net
+
+  replica:
+    build: ./replica
+    container_name: pg-replica
+    depends_on:
+      primary:
+        condition: service_healthy
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      PGDATA: /data
+      REPLICATION_USER: replicator
+      REPLICATION_PASSWORD: repl123
+    volumes:
+      - ./replica/config:/config
+      - replica_data:/data
+    ports:
+      - "5433:5432"
+    command: -c 'config_file=/config/postgresql.conf'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - pg-net
+
+volumes:
+  primary_data:
+  replica_data:
+
+networks:
+  pg-net:
+    driver: bridge

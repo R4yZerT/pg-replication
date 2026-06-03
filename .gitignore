@@ -1,0 +1,6 @@
+# Docker volumes
+primary_data/
+replica_data/
+
+# macOS
+.DS_Store
