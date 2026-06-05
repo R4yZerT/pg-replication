@@ -74,6 +74,11 @@ PRIMARY_HOST=192.168.20.72 docker compose -f docker-compose.replica.yml up -d --
 > $env:PRIMARY_HOST="192.168.20.72"; docker compose -f docker-compose.replica.yml up -d --build
 > ```
 
+> **⚠️ Atención sobre los comandos siguientes:**
+> Los comandos de verificación usan `docker compose exec primary/replica`, que funcionan con `docker-compose.yml` (Opción A). En **Opción B**:
+> - **Máquina A (primaria):** usa `docker compose -f docker-compose.primary.yml exec primary ...`
+> - **Máquina B (réplica):** el servicio se llama `replica`, no `primary`. Para consultar la primaria desde la Máquina B, usa `psql -h <IP-DE-MAQUINA-A> -U postgres -d postgres` directamente; para la réplica local, usa `docker compose -f docker-compose.replica.yml exec replica psql ...`
+
 ### 2. Verificar que la replicación funciona
 
 ```bash
