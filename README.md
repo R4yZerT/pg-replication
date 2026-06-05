@@ -63,6 +63,17 @@ Ejemplo:
 PRIMARY_HOST=192.168.20.72 docker compose -f docker-compose.replica.yml up -d --build
 ```
 
+> **Windows:** usa `set` en CMD o `$env:` en PowerShell:
+> ```cmd
+> REM CMD
+> set PRIMARY_HOST=192.168.20.72
+> docker compose -f docker-compose.replica.yml up -d --build
+> ```
+> ```powershell
+> # PowerShell
+> $env:PRIMARY_HOST="192.168.20.72"; docker compose -f docker-compose.replica.yml up -d --build
+> ```
+
 ### 2. Verificar que la replicación funciona
 
 ```bash
@@ -119,6 +130,11 @@ docker compose down -v
 ```bash
 ipconfig getifaddr en0
 # Ejemplo: 192.168.20.72
+```
+
+```cmd
+REM Windows (CMD)
+ipconfig
 ```
 
 ### Máquina B: conectar a la primaria
