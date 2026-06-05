@@ -3,8 +3,9 @@ set -e
 
 if [ ! -f "$PGDATA/PG_VERSION" ]; then
   echo "Replica data directory is empty. Initializing from primary..."
+  PRIMARY_HOST=${PRIMARY_HOST:-pg-primary}
   until PGPASSWORD=$REPLICATION_PASSWORD pg_basebackup \
-    -h pg-primary \
+    -h $PRIMARY_HOST \
     -p 5432 \
     -U $REPLICATION_USER \
     -D "$PGDATA" \

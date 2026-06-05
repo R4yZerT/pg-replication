@@ -9,22 +9,16 @@ y [este video](https://www.youtube.com/watch?v=FC2JMBYDcJE).
 ## Arquitectura
 
 ```
-┌─ TU MÁQUINA (macOS) ───────────────────────────────────────┐
-│                                                              │
-│  ┌──────────────┐    streaming WAL    ┌──────────────┐       │
-│  │  pg-primary  │ ──────────────────▶ │  pg-replica  │       │
-│  │  (read-write)│      TCP 5432       │  (read-only) │       │
-│  │  puerto 5432 │                     │  puerto 5433 │       │
-│  └──────┬───────┘                     └──────────────┘       │
-│         │                                                    │
-│         │ puerto 5432 expuesto en 0.0.0.0                    │
-├─────────┼────────────────────────────────────────────────────┤
-│         ▼                                                     │
-│  ┌──────────────┐                                            │
-│  │  Tu compañero│  psql -h 192.168.x.x -p 5432 -U postgres  │
-│  │  (otra PC)   │  Misma red local                           │
-│  └──────────────┘                                            │
-└──────────────────────────────────────────────────────────────┘
+┌─ MÁQUINA A (primaria) ─────────────┐    ┌─ MÁQUINA B (réplica) ────────────┐
+│                                     │    │                                   │
+│  ┌──────────────┐                   │    │  ┌──────────────┐                 │
+│  │  pg-primary  │◀─ psql escribe ── │    │  │  pg-replica  │◀─ psql lee ────│
+│  │  (read-write)│                   │    │  │  (read-only) │                 │
+│  │  puerto 5432 │─── WAL stream ────│───▶│  │  puerto 5433 │                 │
+│  └──────────────┘   TCP 5432       │    │  └──────────────┘                 │
+│                                     │    │                                   │
+│  IP: 192.168.x.x                    │    │  IP: 192.168.y.y                  │
+└─────────────────────────────────────┘    └───────────────────────────────────┘
 ```
 
 ---
@@ -39,7 +33,7 @@ y [este video](https://www.youtube.com/watch?v=FC2JMBYDcJE).
 
 ## Comandos esenciales
 
-### 1. Iniciar el lab
+### Opción A: Todo en una máquina (desarrollo local)
 
 ```bash
 cd /Users/yeipezz/Documents/pg-replication
@@ -49,6 +43,25 @@ docker compose up -d --build
 Esto levanta:
 - **pg-primary** (lectura/escritura, puerto `5432`)
 - **pg-replica** (solo lectura, puerto `5433`)
+
+### Opción B: 2 máquinas separadas (laboratorio)
+
+#### Máquina A (primaria)
+```bash
+cd /Users/yeipezz/Documents/pg-replication
+docker compose -f docker-compose.primary.yml up -d
+```
+
+#### Máquina B (réplica)
+```bash
+cd /Users/yeipezz/Documents/pg-replication
+PRIMARY_HOST=<IP-de-MAQUINA-A> docker compose -f docker-compose.replica.yml up -d --build
+```
+
+Ejemplo:
+```bash
+PRIMARY_HOST=192.168.20.72 docker compose -f docker-compose.replica.yml up -d --build
+```
 
 ### 2. Verificar que la replicación funciona
 
@@ -99,24 +112,25 @@ docker compose down -v
 
 ---
 
-## Cómo se conecta tu compañero (misma red local)
+## Conexiones entre máquinas
 
-Tu máquina expone PostgreSQL en **`0.0.0.0:5432`** (todas las interfaces de red).
-
-### Paso 1: Obtén tu IP local
+### Máquina A: obtener IP local
 
 ```bash
 ipconfig getifaddr en0
 # Ejemplo: 192.168.20.72
 ```
 
-### Paso 2: Tu compañero se conecta con cualquier cliente
+### Máquina B: conectar a la primaria
 
 ```bash
-# psql
+# psql a la primaria (escribir datos)
 psql -h 192.168.20.72 -p 5432 -U postgres -d postgres
 
-# Cadena de conexión universal
+# psql a la réplica local (leer datos)
+psql -h localhost -p 5433 -U postgres -d postgres
+
+# Cadena de conexión universal a la primaria
 postgresql://postgres:postgres@192.168.20.72:5432/postgres
 ```
 
@@ -127,17 +141,18 @@ postgresql://postgres:postgres@192.168.20.72:5432/postgres
 | Usuario | `postgres` |
 | Password | `postgres` |
 | Base de datos | `postgres` |
-| Puerto primary | `5432` |
-| Puerto replica | `5433` |
+| Puerto primary (Máq. A) | `5432` |
+| Puerto replica (Máq. B) | `5433` |
 
-> Si no conecta, desactivar temporalmente el firewall de macOS:
-> **Preferencias del Sistema → Red → Firewall → Apagar**
+> Si no conecta, desactivar temporalmente el firewall:
+> macOS → **Preferencias del Sistema → Red → Firewall → Apagar**
 > (O agregar Docker a la lista de permitidos)
 
-### ¿Qué ve tu compañero?
+### ¿Qué hace cada quién?
 
-- **Primary (5432):** lectura y escritura. Puede insertar, modificar, borrar.
-- **Replica (5433):** solo lectura. Lo que escriba en el primary aparece automáticamente aquí.
+- **Máquina A (primaria, puerto 5432):** lectura y escritura. Cualquier INSERT/UPDATE/DELETE se replica a la Máquina B.
+- **Máquina B (réplica, puerto 5433):** solo lectura. Ve los mismos datos que la primaria. Rechaza escrituras.
+- **Ambos** pueden conectarse a la primaria (5432) para escribir.
 
 ---
 
@@ -264,7 +279,9 @@ docker compose up -d --build
 
 ```
 pg-replication/
-├── docker-compose.yml                 # Orquestación primary + replica
+├── docker-compose.yml                 # Opción A: primary + replica (1 máquina)
+├── docker-compose.primary.yml         # Opción B: solo primary (Máquina A)
+├── docker-compose.replica.yml         # Opción B: solo replica (Máquina B)
 ├── README.md
 ├── primary/
 │   ├── config/
@@ -279,7 +296,7 @@ pg-replication/
     │   ├── postgresql.conf            # hot_standby=on
     │   ├── pg_hba.conf                # solo trust localhost + scram-sha-256
     │   └── pg_ident.conf              # mapa de usuarios (vacio por defecto)
-    └── init-replica.sh               # pg_basebackup al arrancar
+    └── init-replica.sh               # pg_basebackup al arrancar (usa $PRIMARY_HOST)
 ```
 
 ---
